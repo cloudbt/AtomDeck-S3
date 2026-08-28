@@ -1,0 +1,7 @@
+.pio/
+.vscode/
+*.log
+secrets.h
+.env
+.env.*
+!.env.example
