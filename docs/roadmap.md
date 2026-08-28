@@ -25,12 +25,12 @@ The target architecture is:
 - mDNS
 - 60-second physical arming window
 
-## v0.2 — authentication
+## v0.2 — implemented in this repository
 
-- One-time bootstrap credential shown only during physical setup
+- Administrator password created during physical setup
 - Password login with an HttpOnly session cookie for browsers
 - Hashed bearer tokens for REST clients
-- Token/session rotation and revocation through physical presence
+- Password rotation and token revocation through physical presence
 - Rate limiting and audit counters without storing typed content
 
 ## v0.3 — transport and lifecycle

@@ -19,8 +19,8 @@ String jsonMessage(const char* key, const String& value) {
 }  // namespace
 
 void ApiServer::begin() {
-  const char* headers[] = {"Origin", "Host"};
-  server_.collectHeaders(headers, 2);
+  const char* headers[] = {"Origin", "Host", "Cookie", "Authorization"};
+  server_.collectHeaders(headers, 4);
 
   server_.on("/", HTTP_GET, [this]() { server_.send_P(200, "text/html; charset=utf-8", INDEX_HTML); });
   server_.on("/generate_204", HTTP_GET,
@@ -28,6 +28,11 @@ void ApiServer::begin() {
   server_.on("/hotspot-detect.html", HTTP_GET,
              [this]() { server_.send_P(200, "text/html; charset=utf-8", INDEX_HTML); });
   server_.on("/api/v1/status", HTTP_GET, [this]() { handleStatus(); });
+  server_.on("/api/v1/auth/login", HTTP_POST, [this]() { handleLogin(); });
+  server_.on("/api/v1/auth/logout", HTTP_POST, [this]() { handleLogout(); });
+  server_.on("/api/v1/auth/me", HTTP_GET, [this]() { handleAuthMe(); });
+  server_.on("/api/v1/auth/password", HTTP_POST, [this]() { handlePasswordChange(); });
+  server_.on("/api/v1/tokens", [this]() { handleTokenCollection(); });
   server_.on("/api/v1/macros", [this]() { handleMacroCollection(); });
   server_.on("/api/v1/type", HTTP_POST, [this]() { handleType(); });
   server_.on("/api/v1/mouse", HTTP_POST, [this]() { handleMouse(); });
@@ -59,6 +64,40 @@ bool ApiServer::requireArmed() {
   return false;
 }
 
+String ApiServer::sessionCookie() {
+  const String cookie = server_.header("Cookie");
+  const String prefix = "atomdeck_session=";
+  int start = cookie.indexOf(prefix);
+  if (start < 0) return String();
+  start += prefix.length();
+  int end = cookie.indexOf(';', start);
+  if (end < 0) end = cookie.length();
+  String value = cookie.substring(start, end);
+  value.trim();
+  return value.length() == 64 ? value : String();
+}
+
+String ApiServer::bearerToken() {
+  const String authorization = server_.header("Authorization");
+  if (!authorization.startsWith("Bearer ")) return String();
+  String token = authorization.substring(7);
+  token.trim();
+  return token;
+}
+
+AuthKind ApiServer::currentAuth() {
+  return auth_.authorize(sessionCookie(), bearerToken());
+}
+
+bool ApiServer::requireAuth(bool sessionOnly) {
+  const AuthKind kind = currentAuth();
+  if (kind != AuthKind::None && (!sessionOnly || kind == AuthKind::Session)) return true;
+  auth_.noteDenied();
+  server_.sendHeader("WWW-Authenticate", "Bearer realm=\"AtomDeck-S3\"");
+  sendError(401, sessionOnly ? "browser administrator session required" : "authentication required");
+  return false;
+}
+
 bool ApiServer::requireSameOrigin() {
   if (!server_.hasHeader("Origin") || server_.header("Origin").isEmpty()) return true;
   const String expected = String("http://") + server_.header("Host");
@@ -75,12 +114,12 @@ void ApiServer::handleStatus() {
   doc["hostname"] = state_.hostName + ".local";
   doc["setup_mode"] = state_.setupMode;
   doc["setup_expired"] = wifi_.setupExpired();
+  doc["auth_configured"] = auth_.configured();
   doc["armed"] = state_.isArmed();
   doc["armed_seconds"] = state_.armedSeconds();
   JsonObject wifi = doc.createNestedObject("wifi");
   wifi["mode"] = state_.setupMode ? "setup-ap" : "station";
   wifi["connected"] = wifi_.connected();
-  wifi["ssid"] = wifi_.ssid();
   wifi["ip"] = wifi_.ip();
   JsonObject storage = doc.createNestedObject("storage");
   storage["used"] = LittleFS.usedBytes();
@@ -91,6 +130,7 @@ void ApiServer::handleStatus() {
 }
 
 void ApiServer::handleMacroCollection() {
+  if (!requireAuth()) return;
   if (server_.method() == HTTP_GET) {
     String json, error;
     if (!store_.list(json, error)) return sendError(500, error);
@@ -116,7 +156,7 @@ void ApiServer::handleDynamicRoute() {
       tail.remove(tail.length() - 4);
     }
     if (tail.isEmpty() || tail.length() > 32) return sendError(404, "not found");
-    if (!requireSameOrigin()) return;
+    if (!requireSameOrigin() || !requireAuth()) return;
 
     if (run && server_.method() == HTTP_POST) {
       if (!requireArmed()) return;
@@ -124,6 +164,7 @@ void ApiServer::handleDynamicRoute() {
       String error;
       if (!store_.get(tail, macro, error)) return sendError(404, error);
       if (!hid_.run(macro["actions"].as<JsonArrayConst>(), error)) return sendError(422, error);
+      auth_.noteMacroRun();
       return sendJson(200, "{\"ok\":true}");
     }
     if (server_.method() == HTTP_PUT) {
@@ -141,6 +182,16 @@ void ApiServer::handleDynamicRoute() {
     return sendError(405, "method not allowed");
   }
 
+  const String tokenPrefix = "/api/v1/tokens/";
+  if (uri.startsWith(tokenPrefix) && server_.method() == HTTP_DELETE) {
+    if (!requireSameOrigin() || !requireAuth(true) || !requireArmed()) return;
+    const String id = uri.substring(tokenPrefix.length());
+    if (id.isEmpty() || id.length() > 32) return sendError(404, "not found");
+    String error;
+    if (!auth_.deleteToken(id, error)) return sendError(404, error);
+    return sendJson(200, "{\"ok\":true}");
+  }
+
   if (state_.setupMode && server_.method() == HTTP_GET) {
     return server_.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
   }
@@ -148,7 +199,7 @@ void ApiServer::handleDynamicRoute() {
 }
 
 void ApiServer::handleType() {
-  if (!requireSameOrigin() || !requireArmed()) return;
+  if (!requireSameOrigin() || !requireAuth() || !requireArmed()) return;
   DynamicJsonDocument body(1024);
   if (deserializeJson(body, server_.arg("plain")) || !body.is<JsonObject>()) {
     return sendError(400, "request body must be JSON");
@@ -159,7 +210,7 @@ void ApiServer::handleType() {
 }
 
 void ApiServer::handleMouse() {
-  if (!requireSameOrigin() || !requireArmed()) return;
+  if (!requireSameOrigin() || !requireAuth() || !requireArmed()) return;
   DynamicJsonDocument body(1024);
   if (deserializeJson(body, server_.arg("plain")) || !body.is<JsonObject>()) {
     return sendError(400, "request body must be JSON");
@@ -183,11 +234,125 @@ void ApiServer::handleWifi() {
     return sendError(400, "request body must be JSON");
   }
   String password = body["password"] | "";
+  String adminPassword = body["admin_password"] | "";
   String error;
+  const bool needsInitialPassword = !auth_.configured();
+  if (!needsInitialPassword) {
+    String temporarySession;
+    uint32_t retryAfter = 0;
+    const bool verified = auth_.login(adminPassword, server_.client().remoteIP().toString(),
+                                      temporarySession, retryAfter, error);
+    adminPassword.clear();
+    if (!verified) {
+      password.clear();
+      body.clear();
+      if (retryAfter > 0) server_.sendHeader("Retry-After", String(retryAfter));
+      return sendError(retryAfter > 0 ? 429 : 401, error);
+    }
+    auth_.logout(temporarySession);
+    temporarySession.clear();
+  } else if (!auth_.setInitialPassword(adminPassword, error)) {
+    password.clear();
+    adminPassword.clear();
+    body.clear();
+    return sendError(422, error);
+  }
   const bool saved = wifi_.saveCredentials(String(body["ssid"] | ""), password, error);
   password.clear();
+  adminPassword.clear();
   body.clear();
-  if (!saved) return sendError(422, error);
+  if (!saved) {
+    if (needsInitialPassword) auth_.clearAll();
+    return sendError(422, error);
+  }
   sendJson(202, "{\"ok\":true,\"restarting\":true}");
   restartAt_ = millis() + 1200;
+}
+
+void ApiServer::handleLogin() {
+  if (!requireSameOrigin()) return;
+  if (!auth_.configured()) return sendError(409, "administrator password is not configured");
+  DynamicJsonDocument body(1024);
+  if (deserializeJson(body, server_.arg("plain")) || !body.is<JsonObject>()) {
+    return sendError(400, "request body must be JSON");
+  }
+  String password = body["password"] | "";
+  String sessionId, error;
+  uint32_t retryAfter = 0;
+  const bool accepted = auth_.login(password, server_.client().remoteIP().toString(), sessionId,
+                                    retryAfter, error);
+  password.clear();
+  body.clear();
+  if (!accepted) {
+    if (retryAfter > 0) server_.sendHeader("Retry-After", String(retryAfter));
+    return sendError(retryAfter > 0 ? 429 : 401, error);
+  }
+  server_.sendHeader("Set-Cookie",
+                     String("atomdeck_session=") + sessionId +
+                         "; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600");
+  sessionId.clear();
+  sendJson(200, "{\"ok\":true}");
+}
+
+void ApiServer::handleLogout() {
+  if (!requireSameOrigin()) return;
+  auth_.logout(sessionCookie());
+  server_.sendHeader("Set-Cookie",
+                     "atomdeck_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+  sendJson(200, "{\"ok\":true}");
+}
+
+void ApiServer::handleAuthMe() {
+  if (!requireAuth()) return;
+  const AuthAudit& audit = auth_.audit();
+  DynamicJsonDocument doc(512);
+  doc["authenticated"] = true;
+  doc["kind"] = currentAuth() == AuthKind::Session ? "session" : "bearer";
+  JsonObject counters = doc.createNestedObject("audit");
+  counters["login_success"] = audit.loginSuccess;
+  counters["login_failure"] = audit.loginFailure;
+  counters["auth_denied"] = audit.authDenied;
+  counters["macro_runs"] = audit.macroRuns;
+  String json;
+  serializeJson(doc, json);
+  sendJson(200, json);
+}
+
+void ApiServer::handlePasswordChange() {
+  if (!requireSameOrigin() || !requireAuth(true) || !requireArmed()) return;
+  DynamicJsonDocument body(1024);
+  if (deserializeJson(body, server_.arg("plain")) || !body.is<JsonObject>()) {
+    return sendError(400, "request body must be JSON");
+  }
+  String current = body["current_password"] | "";
+  String replacement = body["new_password"] | "";
+  String error;
+  const bool changed = auth_.changePassword(current, replacement, error);
+  current.clear();
+  replacement.clear();
+  body.clear();
+  if (!changed) return sendError(422, error);
+  server_.sendHeader("Set-Cookie",
+                     "atomdeck_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+  sendJson(200, "{\"ok\":true,\"login_required\":true}");
+}
+
+void ApiServer::handleTokenCollection() {
+  if (!requireAuth(true)) return;
+  if (server_.method() == HTTP_GET) {
+    String json, error;
+    if (!auth_.listTokens(json, error)) return sendError(500, error);
+    return sendJson(200, json);
+  }
+  if (server_.method() == HTTP_POST) {
+    if (!requireSameOrigin() || !requireArmed()) return;
+    DynamicJsonDocument body(512);
+    if (deserializeJson(body, server_.arg("plain")) || !body.is<JsonObject>()) {
+      return sendError(400, "request body must be JSON");
+    }
+    String json, error;
+    if (!auth_.createToken(String(body["name"] | ""), json, error)) return sendError(422, error);
+    return sendJson(201, json);
+  }
+  sendError(405, "method not allowed");
 }

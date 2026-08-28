@@ -2,6 +2,7 @@
 
 #include "api_server.h"
 #include "app_state.h"
+#include "auth_manager.h"
 #include "config.h"
 #include "hid_executor.h"
 #include "macro_store.h"
@@ -11,7 +12,8 @@ AppState appState;
 WifiManager wifiManager(appState);
 MacroStore macroStore;
 HidExecutor hidExecutor;
-ApiServer apiServer(appState, wifiManager, macroStore, hidExecutor);
+AuthManager authManager;
+ApiServer apiServer(appState, wifiManager, macroStore, hidExecutor, authManager);
 
 namespace {
 
@@ -37,6 +39,7 @@ void handleButton() {
   if (duration >= atomdeck::LONG_PRESS_RESET_MS) {
     appState.disarm();
     wifiManager.clearCredentials();
+    authManager.clearAll();
     delay(100);
     ESP.restart();
     return;
@@ -60,7 +63,11 @@ void setup() {
   if (!macroStore.begin(error)) {
     Serial.println("Macro storage initialization failed");
   }
-  if (!wifiManager.begin(forceSetup, error)) {
+  if (!authManager.begin(error)) {
+    Serial.println("Authentication storage initialization failed");
+  }
+  const bool requireBootstrap = !authManager.configured();
+  if (!wifiManager.begin(forceSetup || requireBootstrap, error)) {
     Serial.println("Wi-Fi initialization failed");
   }
 

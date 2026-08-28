@@ -9,18 +9,22 @@ This repository does **not** copy source code or binaries from
 project was used only to validate the AtomS3U hardware path before this new
 implementation was started.
 
-## First release scope
+## Current release scope
 
 - ESP32-S3 native USB keyboard and mouse HID on M5Stack AtomS3U (8 MB flash)
 - Home Wi-Fi STA mode with a temporary setup AP fallback
 - Responsive on-device macro management page
 - LittleFS-backed macro storage with atomic updates
 - REST API for status, macro CRUD, typing, and macro execution
+- Administrator password login with an HttpOnly, SameSite browser session
+- Hashed REST bearer tokens that are revealed only once when created
+- Login throttling and content-free in-memory audit counters
 - Physical arming: HID-producing and mutating requests work only for 60 seconds
   after the AtomS3U button is pressed
 - No embedded home Wi-Fi credentials, cloud keys, or tokens
 
-Token authentication and AI API integration are intentionally deferred.
+AI API integration is intentionally deferred. The local HTTP transport remains
+documented as a trusted-LAN limitation; HTTPS is planned for v0.3.
 
 ## Hardware status
 
@@ -38,9 +42,10 @@ administer. It does not implement payload scripting, privilege escalation,
 credential collection, keylogging, data extraction, or automatic execution of
 AI-generated actions.
 
-Without token authentication, this version must be used only on a trusted home
-LAN. A physical button press is required before any API can type, run, create,
-change, or delete a macro. Do not store passwords or other secrets in macros.
+Authentication does not make unencrypted HTTP safe on a hostile network, so use
+this version only on a trusted home LAN. A physical button press is required
+before any API can type, run, create, change, or delete a macro or manage a
+token. Do not store passwords or other secrets in macros.
 
 ## Build
 
@@ -69,19 +74,25 @@ temporary open network named `AtomDeck-Setup-XXXX`. It is available for ten
 minutes and only exposes Wi-Fi provisioning plus the status page.
 
 Connect to that network, open `http://192.168.4.1`, enter the home SSID and
-password, and save. The password is written to NVS, never returned by the API,
-never logged, and never belongs in this repository. The device then restarts in
+password, and create an administrator password of 12–72 bytes. The credentials
+are written to NVS, never returned by the API, never logged, and never belong in
+this repository. The administrator verifier uses PBKDF2-HMAC-SHA256 with a
+random salt; the plaintext password is not stored. The device then restarts in
 STA-only mode.
+
+Upgrading from v0.1.0 starts setup mode once so an administrator password can be
+created. Re-enter the existing home Wi-Fi details; saved macros are preserved.
 
 ## Daily use
 
-Open `http://atomdeck-xxxx.local` or the IP shown by your router. Press the
-AtomS3U button once to arm it for 60 seconds. The web page then allows macro
-editing and manual execution. Every execution remains explicit; saving a macro
-never runs it.
+Open `http://atomdeck-xxxx.local` or the IP shown by your router and log in.
+Press the AtomS3U button once to arm it for 60 seconds. The web page then allows
+macro editing, manual execution and token management. Every execution remains
+explicit; saving a macro never runs it.
 
-Holding the programmable button for eight seconds clears saved home Wi-Fi and
-restarts setup mode.
+Holding the programmable button for eight seconds clears saved home Wi-Fi,
+administrator authentication and all REST tokens, then restarts setup mode.
+Stored macros are deliberately preserved.
 
 ## API
 
