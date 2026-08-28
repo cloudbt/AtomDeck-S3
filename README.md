@@ -22,6 +22,15 @@ implementation was started.
 
 Token authentication and AI API integration are intentionally deferred.
 
+## Hardware status
+
+Version 0.1.0 was verified on a physical M5Stack AtomS3U on 2026-08-28:
+
+- 8 MB firmware boots and enumerates as a composite USB keyboard and mouse
+- first-time setup AP provisions home Wi-Fi without exposing the password
+- station mode, mDNS, Chinese Web GUI, and physical arming work on an iPhone
+- direct HID input and mouse controls operate through the authorized target PC
+
 ## Safety boundary
 
 AtomDeck-S3 is for standard, authorized HID automation on devices you own or
