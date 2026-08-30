@@ -38,6 +38,7 @@ class ApiServer {
   void handleAuthMe();
   void handlePasswordChange();
   void handleTokenCollection();
+  void handleLock();
   bool requireArmed();
   bool requireAuth(bool sessionOnly = false);
   bool requireSameOrigin();

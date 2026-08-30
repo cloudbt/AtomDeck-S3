@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 — 2026-08-30
+
+- Changed physical arming to a volatile one-press unlock that lasts until a
+  second button press, explicit Web lock, logout, password change, or restart.
+- Added an authenticated lock endpoint and clear persistent-unlock indicators.
+- Rebuilt the Web GUI as a responsive four-page control deck with a mobile
+  bottom navigation and desktop sidebar.
+- Added customizable dashboard cards with emoji, color and type metadata.
+- Added a visual action builder for launch hotkeys, key combinations, text,
+  delays and restricted mouse actions while retaining advanced JSON editing.
+- Added F1–F12, Insert and Caps Lock to the allow-listed keyboard keys.
+- Preserved all existing v0.1/v0.2 macros and the restricted action model.
+
 ## 0.2.0 — 2026-08-28
 
 - Added administrator password bootstrap and login throttling.

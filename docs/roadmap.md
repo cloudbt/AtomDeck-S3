@@ -33,6 +33,14 @@ The target architecture is:
 - Password rotation and token revocation through physical presence
 - Rate limiting and audit counters without storing typed content
 
+## v0.2.1 — implemented in this repository
+
+- One-press volatile unlock until explicit lock or restart
+- Responsive multi-page mobile/desktop control deck
+- Customizable launch, hotkey, text and macro cards
+- Visual restricted-action builder with advanced JSON fallback
+- Safe Windows shortcut-key launch workflow without storing PC paths
+
 ## v0.3 — transport and lifecycle
 
 - Optional device-side self-signed HTTPS

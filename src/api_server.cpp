@@ -32,6 +32,7 @@ void ApiServer::begin() {
   server_.on("/api/v1/auth/logout", HTTP_POST, [this]() { handleLogout(); });
   server_.on("/api/v1/auth/me", HTTP_GET, [this]() { handleAuthMe(); });
   server_.on("/api/v1/auth/password", HTTP_POST, [this]() { handlePasswordChange(); });
+  server_.on("/api/v1/lock", HTTP_POST, [this]() { handleLock(); });
   server_.on("/api/v1/tokens", [this]() { handleTokenCollection(); });
   server_.on("/api/v1/macros", [this]() { handleMacroCollection(); });
   server_.on("/api/v1/type", HTTP_POST, [this]() { handleType(); });
@@ -60,7 +61,7 @@ void ApiServer::sendError(int status, const String& error) {
 
 bool ApiServer::requireArmed() {
   if (state_.isArmed()) return true;
-  sendError(423, "press the AtomS3U button to arm operations for 60 seconds");
+  sendError(423, "press the AtomS3U button once to unlock operations");
   return false;
 }
 
@@ -116,7 +117,7 @@ void ApiServer::handleStatus() {
   doc["setup_expired"] = wifi_.setupExpired();
   doc["auth_configured"] = auth_.configured();
   doc["armed"] = state_.isArmed();
-  doc["armed_seconds"] = state_.armedSeconds();
+  doc["arming_mode"] = "until-lock-or-restart";
   JsonObject wifi = doc.createNestedObject("wifi");
   wifi["mode"] = state_.setupMode ? "setup-ap" : "station";
   wifi["connected"] = wifi_.connected();
@@ -297,8 +298,15 @@ void ApiServer::handleLogin() {
 void ApiServer::handleLogout() {
   if (!requireSameOrigin()) return;
   auth_.logout(sessionCookie());
+  state_.disarm();
   server_.sendHeader("Set-Cookie",
                      "atomdeck_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
+  sendJson(200, "{\"ok\":true}");
+}
+
+void ApiServer::handleLock() {
+  if (!requireSameOrigin() || !requireAuth(true)) return;
+  state_.disarm();
   sendJson(200, "{\"ok\":true}");
 }
 
@@ -332,6 +340,7 @@ void ApiServer::handlePasswordChange() {
   replacement.clear();
   body.clear();
   if (!changed) return sendError(422, error);
+  state_.disarm();
   server_.sendHeader("Set-Cookie",
                      "atomdeck_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0");
   sendJson(200, "{\"ok\":true,\"login_required\":true}");

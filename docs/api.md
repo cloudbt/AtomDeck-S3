@@ -22,8 +22,10 @@ bearer token contains 256 bits of random data; only its SHA-256 hash is stored.
 The Web GUI reveals a new token once and cannot recover it later.
 
 After five failed logins from one client, login is blocked for 60 seconds.
-HTTP `401` means authentication is missing or invalid, `423` means the physical
-arming window is closed, and `429` means login is temporarily throttled.
+HTTP `401` means authentication is missing or invalid, `423` means the device is
+locked, and `429` means login is temporarily throttled. A short physical button
+press unlocks operations until another press, explicit Web lock, logout,
+password change, or restart. Unlock state is never persisted.
 
 ## Endpoints
 
@@ -34,6 +36,7 @@ arming window is closed, and `429` means login is temporarily throttled.
 | `POST` | `/api/v1/auth/logout` | No | No | End the current browser session |
 | `GET` | `/api/v1/auth/me` | Session or token | No | Authentication kind and audit counters |
 | `POST` | `/api/v1/auth/password` | Session | Yes | Change administrator password |
+| `POST` | `/api/v1/lock` | Session | No | Immediately lock HID and mutations |
 | `GET` | `/api/v1/tokens` | Session | No | List token IDs and names, never secrets |
 | `POST` | `/api/v1/tokens` | Session | Yes | Create and reveal one token once |
 | `DELETE` | `/api/v1/tokens/{id}` | Session | Yes | Revoke a token |
@@ -74,6 +77,10 @@ Allowed action types are `text`, `key`, `chord`, `delay`, `mouse_move`,
 - 256 UTF-8 bytes per text action
 - delays from 0 to 3000 ms, with no more than 15 seconds total per macro
 - chords containing at most three modifiers plus one key
+
+Named keys include Enter, Tab, Escape, Backspace, Delete, Insert, Caps Lock,
+arrows, Home, End, Page Up, Page Down, Space and F1–F12. Chord modifiers are
+`CTRL`, `ALT`, `SHIFT` and `GUI` (the Windows key).
 
 There is deliberately no shell, command, URL, download, or script action.
 

@@ -79,6 +79,22 @@ bool MacroStore::validate(JsonObjectConst macro, String& error) {
     error = "name must contain 1-48 bytes";
     return false;
   }
+  const String icon = macro["icon"] | "";
+  if (icon.length() > atomdeck::MAX_ICON_BYTES) {
+    error = "icon must contain no more than 16 bytes";
+    return false;
+  }
+  const String color = macro["color"] | "blue";
+  if (color != "blue" && color != "purple" && color != "green" && color != "orange" &&
+      color != "pink" && color != "cyan") {
+    error = "invalid card color";
+    return false;
+  }
+  const String kind = macro["kind"] | "macro";
+  if (kind != "launcher" && kind != "hotkey" && kind != "text" && kind != "macro") {
+    error = "invalid card kind";
+    return false;
+  }
   if (!macro["actions"].is<JsonArrayConst>()) {
     error = "actions must be an array";
     return false;
@@ -196,6 +212,9 @@ bool MacroStore::create(const String& body, String& json, String& error) {
   JsonObject created = macros.createNestedObject();
   created["id"] = newId();
   created["name"] = input["name"].as<String>();
+  created["icon"] = input["icon"] | "⚡";
+  created["color"] = input["color"] | "blue";
+  created["kind"] = input["kind"] | "macro";
   created["actions"] = input["actions"];
   if (!save(store, error)) return false;
   serializeJson(created, json);
@@ -218,6 +237,9 @@ bool MacroStore::replace(const String& id, const String& body, String& json, Str
   target.clear();
   target["id"] = id;
   target["name"] = input["name"].as<String>();
+  target["icon"] = input["icon"] | "⚡";
+  target["color"] = input["color"] | "blue";
+  target["kind"] = input["kind"] | "macro";
   target["actions"] = input["actions"];
   if (!save(store, error)) return false;
   serializeJson(target, json);

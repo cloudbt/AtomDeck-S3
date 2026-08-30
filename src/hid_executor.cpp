@@ -20,6 +20,8 @@ uint8_t namedKeyCode(const String& name) {
   if (name == "ESC") return KEY_ESC;
   if (name == "BACKSPACE") return KEY_BACKSPACE;
   if (name == "DELETE") return KEY_DELETE;
+  if (name == "INSERT") return KEY_INSERT;
+  if (name == "CAPSLOCK") return KEY_CAPS_LOCK;
   if (name == "UP") return KEY_UP_ARROW;
   if (name == "DOWN") return KEY_DOWN_ARROW;
   if (name == "LEFT") return KEY_LEFT_ARROW;
@@ -29,6 +31,18 @@ uint8_t namedKeyCode(const String& name) {
   if (name == "PAGEUP") return KEY_PAGE_UP;
   if (name == "PAGEDOWN") return KEY_PAGE_DOWN;
   if (name == "SPACE") return ' ';
+  if (name == "F1") return KEY_F1;
+  if (name == "F2") return KEY_F2;
+  if (name == "F3") return KEY_F3;
+  if (name == "F4") return KEY_F4;
+  if (name == "F5") return KEY_F5;
+  if (name == "F6") return KEY_F6;
+  if (name == "F7") return KEY_F7;
+  if (name == "F8") return KEY_F8;
+  if (name == "F9") return KEY_F9;
+  if (name == "F10") return KEY_F10;
+  if (name == "F11") return KEY_F11;
+  if (name == "F12") return KEY_F12;
   return 0;
 }
 

@@ -13,14 +13,15 @@ implementation was started.
 
 - ESP32-S3 native USB keyboard and mouse HID on M5Stack AtomS3U (8 MB flash)
 - Home Wi-Fi STA mode with a temporary setup AP fallback
-- Responsive on-device macro management page
+- Responsive four-page control deck for mobile and desktop browsers
+- Customizable shortcut cards with visual action editing and optional JSON mode
 - LittleFS-backed macro storage with atomic updates
 - REST API for status, macro CRUD, typing, and macro execution
 - Administrator password login with an HttpOnly, SameSite browser session
 - Hashed REST bearer tokens that are revealed only once when created
 - Login throttling and content-free in-memory audit counters
-- Physical arming: HID-producing and mutating requests work only for 60 seconds
-  after the AtomS3U button is pressed
+- Volatile physical unlock: one button press authorizes operations until a
+  second press, explicit lock, logout, password change, or restart
 - No embedded home Wi-Fi credentials, cloud keys, or tokens
 
 AI API integration is intentionally deferred. The local HTTP transport remains
@@ -45,7 +46,8 @@ AI-generated actions.
 Authentication does not make unencrypted HTTP safe on a hostile network, so use
 this version only on a trusted home LAN. A physical button press is required
 before any API can type, run, create, change, or delete a macro or manage a
-token. Do not store passwords or other secrets in macros.
+token. The unlocked state remains active until explicitly ended, so lock the
+device whenever the target PC is unattended. Do not store secrets in macros.
 
 ## Build
 
@@ -86,9 +88,16 @@ created. Re-enter the existing home Wi-Fi details; saved macros are preserved.
 ## Daily use
 
 Open `http://atomdeck-xxxx.local` or the IP shown by your router and log in.
-Press the AtomS3U button once to arm it for 60 seconds. The web page then allows
-macro editing, manual execution and token management. Every execution remains
-explicit; saving a macro never runs it.
+Press the AtomS3U button once to unlock it. The state remains active in RAM until
+you press the button again, click **Lock**, log out, change the administrator
+password, or restart the device. Every execution remains explicit; saving a
+card never runs it.
+
+The dashboard supports launch, hotkey, text and multi-step macro cards. To open
+an application, file, folder or website, assign a keyboard shortcut to a
+Windows shortcut and configure the same chord on its AtomDeck launch card. The
+firmware deliberately stores no PC path and executes no shell command. See
+[docs/windows-launchers.md](docs/windows-launchers.md).
 
 Holding the programmable button for eight seconds clears saved home Wi-Fi,
 administrator authentication and all REST tokens, then restarts setup mode.

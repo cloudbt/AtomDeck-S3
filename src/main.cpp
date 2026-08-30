@@ -46,7 +46,7 @@ void handleButton() {
   }
   if (duration >= 35) {
     if (appState.isArmed()) appState.disarm();
-    else appState.arm(atomdeck::ARM_WINDOW_MS);
+    else appState.arm();
   }
 }
 

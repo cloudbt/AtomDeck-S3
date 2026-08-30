@@ -5,7 +5,8 @@
 - Home Wi-Fi credentials are written to ESP32 NVS and never returned or logged.
 - The fallback setup AP is temporary, starts only when provisioning is needed,
   and stops after ten minutes.
-- HID and macro mutations require a recent physical button press.
+- HID and macro mutations require a physical button unlock. Unlock is volatile
+  and ends on another button press, Web lock, logout, password change or reboot.
 - Macro actions are an allow-listed data model, not a general scripting language.
 - Macro files are size-limited, validated before saving and again before running.
 - Browser write requests are protected against cross-origin submission.
@@ -27,6 +28,9 @@
   encryption. Physical extraction remains possible.
 - The setup AP is open for usability on a screenless device. Provision promptly
   and do not expose setup mode in an untrusted location.
+- The persistent-in-RAM unlock trades convenience for a longer authorization
+  window. Lock the device whenever the target PC is unattended; bearer tokens
+  can produce HID while the device remains unlocked.
 
 ## Future hardening
 
